@@ -13,15 +13,18 @@ define([
     "dojo/_base/lang",
     "dojo/text",
     "dojo/html",
+    "dojo/_base/window",
     "dojo/_base/event",
 
     "dojo/text!FacebookWebviewWidget/widget/template/FacebookWebviewWidget.html"
-], function (declare, _WidgetBase, _TemplatedMixin, dom, dojoDom, dojoProp, dojoGeometry, dojoClass, dojoStyle, dojoConstruct, dojoArray, dojoLang, dojoText, dojoHtml, dojoEvent, widgetTemplate) {
+], function (declare, _WidgetBase, _TemplatedMixin, dom, dojoDom, dojoProp, dojoGeometry, dojoClass, dojoStyle, dojoConstruct, dojoArray, dojoLang, dojoText, dojoHtml, dojoWindow, dojoEvent, widgetTemplate) {
     "use strict";
 
     return declare("FacebookWebviewWidget.widget.FacebookWebviewWidget", [ _WidgetBase, _TemplatedMixin ], {
 
         templateString: widgetTemplate,
+        facebookUsers: [],
+        loadedScriptSuccessfully: false,
         autoLoad: false,
         timeout: 1000,
 
@@ -29,32 +32,53 @@ define([
 
         // Internal variables.
         _handles: null,
-        _contextObj: null,
 
         constructor: function () {
             this._handles = [];
         },
 
         postCreate: function () {
-            var webview;
-            webview = this;
-            var webviewScript;
-            webviewScript = document.createElement("script");
-            webviewScript.setAttribute("type","text/javascript");
-            webviewScript.setAttribute("src","text/javascript");
-            
             logger.debug(webview.id + ".postCreate");
-            dojoConstruct.place();
-
+            //Load external Facebook Messenger Webview Extention script
+            var webview = this;
+            var webviewScript = document.createElement("script");
+            webviewScript.setAttribute("type","text/javascript");
+            webviewScript.setAttribute("src","js/FacebookMessengerExtentions.js");
+            //Place it as first child
+            dojoConstruct.create(webviewScript, null, dojoWindow.body(),first);
+            //Wait for Async load of Facebook Messenger Webview Extention script
             setTimeout(function () {
-                webview.set("loaded");
+                window.extAsyncInit(){
+                    //Script loaded
+                    this.loadedScriptSuccessfully = true;
+                    //Try retrieve userID
+                    MessengerExtensions.getUserID(function success(uids) {
+                        // User ID was successfully obtained.
+                        var psid = uids.psid;
+                        mx.data.get({
+                            xpath: "//FacebookMessenger.FacebookUser/pageScopedFacebookID ="+psid,
+                            filter: {
+                                amount: 1,
+                                filter: distinct
+                            },
+                            callback: function(objs) {
+                                logger.debug(this.id + "loaded Facebook User by pageScopedUserID");
+                                this.facebookUsers = objs;
+                                webview.set("loaded",true);
+                            }
+                        });
+
+                    }, function error(err, errorMessage) {
+                        // Error handling code
+                    });
+                    webview.set("loaded",true);
+                }
             }, timeout);
         },
 
-        update: function (obj, callback) {
+        update: function ( callback) {
             logger.debug(this.id + ".update");
 
-            this._contextObj = obj;
             this._updateRendering(callback);
         },
 
@@ -64,6 +88,15 @@ define([
 
         uninitialize: function () {
           logger.debug(this.id + ".uninitialize");
+          MessengerExtensions.requestCloseBrowser(function success() {
+
+          }, function error(err) {
+
+          });
+        },
+
+        _setupEvents: function(){
+
         },
 
         _updateRendering: function (callback) {
