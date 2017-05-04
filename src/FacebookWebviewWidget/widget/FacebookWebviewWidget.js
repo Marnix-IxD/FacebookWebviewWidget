@@ -22,7 +22,8 @@ define([
     return declare("FacebookWebviewWidget.widget.FacebookWebviewWidget", [ _WidgetBase, _TemplatedMixin ], {
 
         templateString: widgetTemplate,
-
+        autoLoad: false,
+        timeout: 1000,
 
         widgetBase: null,
 
@@ -35,7 +36,19 @@ define([
         },
 
         postCreate: function () {
-            logger.debug(this.id + ".postCreate");
+            var webview;
+            webview = this;
+            var webviewScript;
+            webviewScript = document.createElement("script");
+            webviewScript.setAttribute("type","text/javascript");
+            webviewScript.setAttribute("src","text/javascript");
+            
+            logger.debug(webview.id + ".postCreate");
+            dojoConstruct.place();
+
+            setTimeout(function () {
+                webview.set("loaded");
+            }, timeout);
         },
 
         update: function (obj, callback) {
